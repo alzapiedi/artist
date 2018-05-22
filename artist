@@ -1,0 +1,45 @@
+#! /usr/bin/env node
+const http = require('http');
+
+const args = process.argv.slice(2);
+const artist = args.join(' ');
+const url = 'http://robertchristgau.com/get_artist.php?name=' + artist;
+
+artist ? fetch(url).then(parseResponse) : console.log('NO ARTIST SPECIFIED\nSample usage: artist red hot chili peppers');
+
+function parseResponse(res) {
+  if (res.indexOf('Error:') > -1) return console.log('NO MATCHES');
+  if (res.indexOf('Search for:') > -1) return console.log('MULTIPLE RESULTS, BE MORE SPECIFIC');
+  const artist = /<h2>(.*)<\/h2>/.exec(res)[1];
+  const startIdx = res.indexOf('<ul>');
+  const endIdx = res.indexOf('</ul>');
+  const albums = res.slice(startIdx + 4, endIdx).trim().split('\n');
+  console.log(`\nALBUMS BY ${artist}`);
+  console.log('-------------------------------------');
+  albums.forEach(album => {
+    const arr = album.split(/\[.*\]/);
+    const title = stripTags(arr[0]);
+    const score = arr[1].indexOf('img') > -1 ? getImageScore(arr[1]) : stripTags(arr[1]);
+    const year = /\d{4}/.exec(album)[0];
+    console.log(`\x1b[1m${title}\x1b[0m (${year}) ${score}`);
+  })
+}
+
+function fetch(url) {
+  return new Promise(function(resolve, reject) {
+    const options = { }
+    http.get(url, res => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => resolve(data))
+    }).on('error', () => reject());
+  });
+}
+
+function stripTags(string) {
+  return string.replace(/<\/?[a-z]*>/g, '').trim();
+}
+
+function getImageScore(image) {
+  return /alt=\"(.*)\"/.exec(image)[1];
+}
